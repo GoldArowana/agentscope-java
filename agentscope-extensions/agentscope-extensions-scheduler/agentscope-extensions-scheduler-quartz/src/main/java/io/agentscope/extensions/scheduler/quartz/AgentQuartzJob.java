@@ -56,11 +56,27 @@ public class AgentQuartzJob implements InterruptableJob {
         String taskName = context.getJobDetail().getJobDataMap().getString("taskName");
         QuartzAgentScheduler scheduler = QuartzAgentSchedulerRegistry.get(schedulerId);
         if (scheduler == null) {
-            return;
+            throw new JobExecutionException(
+                    String.format(
+                            "No QuartzAgentScheduler registered in this process. schedulerId=%s,"
+                                    + " taskName=%s, jobKey=%s, triggerKey=%s",
+                            schedulerId,
+                            taskName,
+                            context.getJobDetail().getKey(),
+                            context.getTrigger().getKey()),
+                    false);
         }
         QuartzScheduleAgentTask task = scheduler.getScheduledAgent(taskName);
         if (task == null) {
-            return;
+            throw new JobExecutionException(
+                    String.format(
+                            "No scheduled agent task found. schedulerId=%s, taskName=%s, jobKey=%s,"
+                                    + " triggerKey=%s",
+                            schedulerId,
+                            taskName,
+                            context.getJobDetail().getKey(),
+                            context.getTrigger().getKey()),
+                    false);
         }
 
         ScheduleAgentTask<Msg> t = task;

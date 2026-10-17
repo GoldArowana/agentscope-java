@@ -72,6 +72,8 @@ scheduler.cancel("DailyReportAgent");
 scheduler.shutdown();
 ```
 
+Quartz stores job details and triggers, while executable AgentScope tasks depend on the scheduler registered in the current JVM. If a fired job cannot resolve its scheduler or task, execution fails with a `JobExecutionException` containing `schedulerId`, `taskName`, `jobKey`, and `triggerKey`, so Quartz logs and job listeners can identify the dropped execution. This failure does not request an immediate retry or unschedule triggers. Persisted Quartz jobs alone do not restore executable agent configuration after a restart or on another replica.
+
 ## XXL-Job mode
 
 ### Add the dependency

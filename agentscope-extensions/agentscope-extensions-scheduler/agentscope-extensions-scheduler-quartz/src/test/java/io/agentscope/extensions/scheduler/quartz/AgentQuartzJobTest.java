@@ -16,6 +16,7 @@
 package io.agentscope.extensions.scheduler.quartz;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -68,6 +69,10 @@ class AgentQuartzJobTest {
         when(mockJobDetail.getJobDataMap()).thenReturn(mockJobDataMap);
         when(mockJobDataMap.getString("schedulerId")).thenReturn(schedulerId);
         when(mockJobDataMap.getString("taskName")).thenReturn(taskName);
+        when(mockJobDetail.getKey()).thenReturn(new JobKey(taskName));
+        Trigger trigger = mock(Trigger.class);
+        when(mockContext.getTrigger()).thenReturn(trigger);
+        when(trigger.getKey()).thenReturn(new TriggerKey("test-trigger"));
 
         // Register mock scheduler
         QuartzAgentSchedulerRegistry.register(schedulerId, mockScheduler);
@@ -137,25 +142,46 @@ class AgentQuartzJobTest {
     }
 
     @Test
-    void testExecuteSchedulerNotFound() throws JobExecutionException {
+    void testExecuteSchedulerNotFound() {
         // Unregister scheduler to simulate not found
         QuartzAgentSchedulerRegistry.unregister(schedulerId);
 
-        agentQuartzJob.execute(mockContext);
+        JobExecutionException exception =
+                assertThrows(
+                        JobExecutionException.class, () -> agentQuartzJob.execute(mockContext));
+        assertTrue(exception.getMessage().contains("No QuartzAgentScheduler registered"));
+        assertResolutionFailureContext(exception);
 
         // Verify no interaction with scheduler (since it's null) or task
         verify(mockScheduler, never()).getScheduledAgent(any());
     }
 
     @Test
-    void testExecuteTaskNotFound() throws JobExecutionException {
+    void testExecuteTaskNotFound() {
         // Scheduler found, but task not found
         when(mockScheduler.getScheduledAgent(taskName)).thenReturn(null);
 
-        agentQuartzJob.execute(mockContext);
+        JobExecutionException exception =
+                assertThrows(
+                        JobExecutionException.class, () -> agentQuartzJob.execute(mockContext));
+        assertTrue(exception.getMessage().contains("No scheduled agent task found"));
+        assertResolutionFailureContext(exception);
 
         // Verify
         verify(mockTask, never()).run();
+        verify(mockTask, never()).run(any(Msg.class));
+        verify(mockScheduler, never()).rescheduleNextFixedDelay(any(), anyLong());
+    }
+
+    private void assertResolutionFailureContext(JobExecutionException exception) {
+        assertTrue(exception.getMessage().contains("schedulerId=" + schedulerId));
+        assertTrue(exception.getMessage().contains("taskName=" + taskName));
+        assertTrue(exception.getMessage().contains("jobKey=" + mockJobDetail.getKey()));
+        assertTrue(
+                exception.getMessage().contains("triggerKey=" + mockContext.getTrigger().getKey()));
+        assertFalse(exception.refireImmediately());
+        assertFalse(exception.unscheduleFiringTrigger());
+        assertFalse(exception.unscheduleAllTriggers());
     }
 
     @Test

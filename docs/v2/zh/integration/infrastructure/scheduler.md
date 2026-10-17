@@ -72,6 +72,8 @@ scheduler.cancel("DailyReportAgent");
 scheduler.shutdown();
 ```
 
+Quartz 保存 Job 和 Trigger，但可执行的 AgentScope 任务依赖当前 JVM 中注册的调度器。如果触发的 Job 无法找到对应的调度器或任务，执行会抛出包含 `schedulerId`、`taskName`、`jobKey` 和 `triggerKey` 的 `JobExecutionException`，使 Quartz 日志和 Job 监听器能够识别此次未执行的任务。此异常不会请求立即重试或取消 Trigger。仅持久化 Quartz Job 无法在进程重启后或其他副本上恢复可执行的 Agent 配置。
+
 ## XXL-Job 模式（分布式）
 
 ### 添加依赖
